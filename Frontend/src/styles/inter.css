@@ -1,0 +1,23 @@
+:root { font-family: 'Inter', 'system-ui', sans-serif; }
+
+.radix-themes {
+	--default-font-family: "Inter", "system-ui";
+    --heading-font-family: "Inter", "system-ui";
+	--code-font-family: "Inter", "system-ui";
+	--strong-font-family: "Inter", "system-ui";
+	--em-font-family: "Inter", "system-ui";
+	--quote-font-family: "Inter", "system-ui";
+}
+
+@supports (font-variation-settings: normal) {
+	:root { font-family: 'InterVariable', 'system-ui', sans-serif; }
+
+	.radix-themes {
+		--default-font-family: "InterVariable", "system-ui";
+		--heading-font-family: "InterVariable", "system-ui";
+		--code-font-family: "InterVariable", "system-ui";
+		--strong-font-family: "InterVariable", "system-ui";
+		--em-font-family: "InterVariable", "system-ui";
+		--quote-font-family: "InterVariable", "system-ui";
+	}
+}

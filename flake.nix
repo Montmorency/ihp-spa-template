@@ -20,6 +20,7 @@
                     projectPath = ./.;
                     packages = with pkgs; [
                         # Native dependencies, e.g. imagemagick
+                        nodejs
                     ];
                     haskellPackages = p: with p; [
                         # Haskell dependencies go here
@@ -36,6 +37,8 @@
 
                 # Custom configuration that will start with `devenv up`
                 devenv.shells.default = {
+                    process.implementation = "overmind";
+                    
                     # Start Mailhog on local development to catch outgoing emails
                     # services.mailhog.enable = true;
 
@@ -47,9 +50,14 @@
                                 touch Frontend/src/index.tsx # Force rebuild
 
                                 cd Frontend
-                                NODE_PATH=${config.devenv.shells.default.env.NODE_PATH} ${pkgs.esbuild}/bin/esbuild src/index.tsx --bundle --loader:.woff=file --loader:.woff2=file --loader:.ttf=file --loader:.svg=file --loader:.png=file --loader:.gif=file --main-fields=module,main --define:global=globalThis --outfile=../static/Frontend/main.js --watch
+                                ${pkgs.yarn}/bin/yarn install
+                                NODE_PATH=${config.devenv.shells.default.env.NODE_PATH} ${pkgs.esbuild}/bin/esbuild src/index.tsx --bundle --loader:.woff=file --loader:.woff2=file --loader:.ttf=file --loader:.svg=file --loader:.png=file --loader:.gif=file --main-fields=module,main --define:global=globalThis --outfile=../static/Frontend/main.js --watch=forever
                             '';
-                        tailwind.exec = "cd Frontend && ./node_modules/.bin/tailwindcss -i ./src/styles/globals.css -o ./src/tailwind.css --watch";
+                        tailwind.exec = ''
+                            cd Frontend
+                            ${pkgs.yarn}/bin/yarn install
+                            ./node_modules/.bin/tailwindcss -i ./src/styles/globals.css -o ./src/tailwind.css --watch
+                        '';
                     };
 
                     scripts.update-typescript-types.exec = ''
@@ -110,15 +118,4 @@
             };
 
         };
-
-    # Add own cachix cache here to speed up builds.
-    # Uncomment the following lines and replace `CHANGE-ME` with your cachix cache name
-    # nixConfig = {
-    #     extra-substituters = [
-    #         "https://CHANGE-ME.cachix.org"
-    #     ];
-    #     extra-trusted-public-keys = [
-    #         "CHANGE-ME.cachix.org-1:CHANGE-ME-PUBLIC-KEY"
-    #     ];
-    # };
 }

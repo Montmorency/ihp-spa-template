@@ -1,4 +1,4 @@
-module Web.View.Layout (defaultLayout, Html) where
+module Web.View.Layout (defaultLayout, frontendApp, Html) where
 
 import IHP.ViewPrelude
 import IHP.Environment
@@ -35,26 +35,11 @@ defaultLayout inner = [hsx|
 
 stylesheets :: Html
 stylesheets = [hsx|
-        <link rel="stylesheet" href={assetPath "/vendor/bootstrap-5.2.1/bootstrap.min.css"}/>
-        <link rel="stylesheet" href={assetPath "/vendor/flatpickr.min.css"}/>
-        <link rel="stylesheet" href={assetPath "/app.css"}/>
     |]
 
 scripts :: Html
 scripts = [hsx|
         {when isDevelopment devScripts}
-        <script src={assetPath "/vendor/jquery-3.6.0.slim.min.js"}></script>
-        <script src={assetPath "/vendor/timeago.js"}></script>
-        <script src={assetPath "/vendor/popper-2.11.6.min.js"}></script>
-        <script src={assetPath "/vendor/bootstrap-5.2.1/bootstrap.min.js"}></script>
-        <script src={assetPath "/vendor/flatpickr.js"}></script>
-        <script src={assetPath "/vendor/morphdom-umd.min.js"}></script>
-        <script src={assetPath "/vendor/turbolinks.js"}></script>
-        <script src={assetPath "/vendor/turbolinksInstantClick.js"}></script>
-        <script src={assetPath "/vendor/turbolinksMorphdom.js"}></script>
-        <script src={assetPath "/helpers.js"}></script>
-        <script src={assetPath "/ihp-auto-refresh.js"}></script>
-        <script src={assetPath "/app.js"}></script>
     |]
 
 devScripts :: Html
@@ -70,5 +55,16 @@ metaTags = [hsx|
     <meta property="og:type" content="website"/>
     <meta property="og:url" content="TODO"/>
     <meta property="og:description" content="TODO"/>
-    {autoRefreshMeta}
 |]
+
+frontendApp :: Html
+frontendApp = [hsx| 
+        {appRoot}
+        <script src={assetPath "/Frontend/main.js"} />
+        <link rel="stylesheet" href={assetPath "/Frontend/main.css"}/>
+    |]
+
+appRoot :: Html
+appRoot = case currentUserOrNothing of
+    Just currentUser -> [hsx|<div id="root" data-user-id={inputValue currentUser}/>|]
+    Nothing -> [hsx|<div id="root"/>|]
