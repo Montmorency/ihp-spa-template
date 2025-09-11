@@ -13,9 +13,9 @@
             systems = import systems;
             imports = [ ihp.flakeModules.default ];
 
-            perSystem = { pkgs, ... }: {
+            perSystem = { pkgs, system, config, ... }: {
                 ihp = {
-                    appName = "app"; # Change this to your project name
+                    appName = "ihp-spa"; # Change this to your project name
                     enable = true;
                     projectPath = ./.;
                     packages = with pkgs; [
@@ -41,105 +41,72 @@
 
                     # Custom processes that don't appear in https://devenv.sh/reference/options/
                     processes = {
-                        # Uncomment if you use tailwindcss.
-                        # tailwind.exec = "tailwindcss -c tailwind/tailwind.config.js -i ./tailwind/app.css -o static/app.css --watch=always";
+                        frontend.exec = ''
+                                mkdir -p static/Frontend
+
+                                touch Frontend/src/index.tsx # Force rebuild
+
+                                cd Frontend
+                                NODE_PATH=${config.devenv.shells.default.env.NODE_PATH} ${pkgs.esbuild}/bin/esbuild src/index.tsx --bundle --loader:.woff=file --loader:.woff2=file --loader:.ttf=file --loader:.svg=file --loader:.png=file --loader:.gif=file --main-fields=module,main --define:global=globalThis --outfile=../static/Frontend/main.js --watch
+                            '';
+                        tailwind.exec = "cd Frontend && ./node_modules/.bin/tailwindcss -i ./src/styles/globals.css -o ./src/tailwind.css --watch";
                     };
+
+                    scripts.update-typescript-types.exec = ''
+                        ${ihp.packages.${system}.datasync-typescript}/bin/generate-datasync-types Application/Schema.sql Frontend/types/ihp-datasync/index.d.ts
+                    '';
+
+                    env.NODE_PATH =
+                        let ihpNodeModules = pkgs.linkFarm "ihp-node-modules" [ { name = "ihp-datasync"; path = "${ihp}/ihp/data/DataSync"; } ];
+                        in "${ihpNodeModules}:node_modules";
                 };
-            };
 
-            # Adding the new NixOS configuration for "qa"
-            # See https://ihp.digitallyinduced.com/Guide/deployment.html#deploying-with-deploytonixos for more info
-            # Used to deploy the IHP application to AWS.
-            #
-            # Change the `CHANGE-ME` to your correct config.
-            flake.nixosConfigurations."qa" = nixpkgs.lib.nixosSystem {
-                system = "x86_64-linux";
-                specialArgs = inputs;
-                modules = [
-                    "${nixpkgs}/nixos/modules/virtualisation/amazon-image.nix"
-                    ihp.nixosModules.appWithPostgres
-                    ({ lib, pkgs, ... }: {
 
-                        networking.firewall = {
-                            enable = true;
-                            allowedTCPPorts = [ 22 80 443 ];
+
+                packages.frontend =
+                    let
+                        node-modules = pkgs.mkYarnModules {
+                            pname = "${config.ihp.appName}-frontend-deps";
+                            packageJSON = ./Frontend/package.json;
+                            yarnLock = ./Frontend/yarn.lock;
+                            version = "1.0.0";
                         };
-
-                        # Enable the Let's encrypt certificate
-                        security.acme.defaults.email = "CHANGE-ME@example.com";
-
-                        # Accept the terms of service of the Let's encrypt provider.
-                        security.acme.acceptTerms = true;
-
-                        services.nginx = {
-                            virtualHosts."CHANGE-ME.com" =  {
-                                # Uncomment to have http auth with username `foo` and password `bar`.
-                                # basicAuth = { foo = "bar"; };
-                            };
+                        filter = ihp.inputs.nix-filter.lib;
+                    in pkgs.stdenv.mkDerivation {
+                        name = "${config.ihp.appName}-frontend";
+                        src = filter {
+                            root = ./Frontend;
+                            include = ["src" "lib" "hooks" "components" "types" (filter.matchExt "js") (filter.matchExt "ts") (filter.matchExt "tsx") (filter.matchExt "json") (filter.matchExt "css")];
+                            exclude = ["node_modules"];
                         };
+                        nativeBuildInputs = [pkgs.yarn node-modules pkgs.esbuild];
+                        buildPhase = ''
+                        ln -s ${node-modules}/node_modules ./node_modules
+                        export PATH="node_modules/bin:$PATH"
 
-                        # Logging to AWS CloudWatch
-                        # services.vector = {
-                        #     enable = true;
-                        #     journaldAccess = true;
-                        #     settings = {
-                        #         sources.journald = {
-                        #             type = "journald";
-                        #             # Log only the services we care about
-                        #             include_units = ["app.service" "nginx.service" "worker.service"];
-                        #         };
+                        mkdir -p ihp-node_modules
+                        ln -s ${ihp}/ihp/data/DataSync ihp-node_modules/ihp-datasync
 
-                        #         sinks.out = {
-                        #             group_name = "CHANGE-ME";
-                        #             stream_name = "CHANGE-ME";
-                        #             # Change the region to the correct one, e.g. `us-east-1`
-                        #             region = "CHANGE-ME";
-                        #             auth = {
-                        #                 access_key_id = "CHANGE-ME";
-                        #                 secret_access_key = "CHANGE-ME";
-                        #             };
-                        #             inputs  = ["journald"];
-                        #             type = "aws_cloudwatch_logs";
-                        #             compression = "gzip";
-                        #             encoding.codec = "json";
-                        #         };
-                        #     };
-                        # };
+                        ${node-modules}/node_modules/.bin/tailwindcss -i ./src/styles/globals.css -o ./src/tailwind.css
 
-                        services.ihp = {
-                            domain = "CHANGE-ME.com";
-                            migrations = ./Application/Migration;
-                            schema = ./Application/Schema.sql;
-                            fixtures = ./Application/Fixtures.sql;
-                            sessionSecret = "CHANGE-ME";
-                            # Uncomment to use a custom database URL
-                            # databaseUrl = lib.mkForce "postgresql://postgres:...CHANGE-ME";
-
-                            additionalEnvVars = {
-                                # Uncomment to use a custom session secret, ensuring sessions aren't invalidated
-                                # on each deploy.
-                                # Learn how to create the secret key in https://ihp.digitallyinduced.com/Guide/deployment.html#ihpsessionsecret
-                                # IHP_SESSION_SECRET = "CHANGE-ME";
-
-                                SMTP_HOST = "email-smtp.eu-west-1.amazonaws.com";
-                                SMTP_PORT = "587";
-                                SMTP_ENCRYPTION = "STARTTLS";
-
-                                SMTP_USER = "CHANGE-ME";
-                                SMTP_PASSWORD = "CHANGE-ME";
-
-                                AWS_ACCESS_KEY_ID = "CHANGE-ME";
-                                AWS_SECRET_ACCESS_KEY = "CHANGE-ME";
-                            };
-                        };
-                        # As we use a pre-built AMI on AWS,
-                        # it is essential to enable automatic updates.
-                        # @see https://nixos.wiki/wiki/Automatic_system_upgrades
-                        system.autoUpgrade.enable = true;
-                        # Keep as is. See https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-                        system.stateVersion = "23.05";
-                    })
-                ];
+                        NODE_PATH=ihp-node_modules:node_modules ${pkgs.esbuild}/bin/esbuild src/index.tsx \
+                            --preserve-symlinks \
+                            --bundle \
+                            --loader:.woff=file \
+                            --loader:.woff2=file \
+                            --loader:.ttf=file \
+                            --loader:.svg=file \
+                            --loader:.png=file \
+                            --loader:.gif=file \
+                            --main-fields=module,main \
+                            --define:global=globalThis \
+                            --define:process.env.NODE_ENV=\"production\" \
+                            --minify \
+                            --legal-comments=none \
+                            --outfile=$out/main.js
+                        '';
+                        allowedReferences = [];
+                    };
             };
 
         };
