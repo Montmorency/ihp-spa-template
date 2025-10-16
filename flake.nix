@@ -1,6 +1,6 @@
 {
     inputs = {
-        ihp.url = "github:digitallyinduced/ihp/v1.4";
+        ihp.url = "github:digitallyinduced/ihp";
         nixpkgs.follows = "ihp/nixpkgs";
         flake-parts.follows = "ihp/flake-parts";
         devenv.follows = "ihp/devenv";
@@ -65,7 +65,7 @@
                     '';
 
                     env.NODE_PATH =
-                        let ihpNodeModules = pkgs.linkFarm "ihp-node-modules" [ { name = "ihp-datasync"; path = "${ihp}/ihp/data/DataSync"; } ];
+                        let ihpNodeModules = pkgs.linkFarm "ihp-node-modules" [ { name = "ihp-datasync"; path = "${ihp}/ihp-datasync/data/DataSync"; } ];
                         in "${ihpNodeModules}:node_modules";
                 };
 
@@ -93,7 +93,7 @@
                         export PATH="node_modules/bin:$PATH"
 
                         mkdir -p ihp-node_modules
-                        ln -s ${ihp}/ihp/data/DataSync ihp-node_modules/ihp-datasync
+                        ln -s ${ihp}/ihp-datasync/data/DataSync ihp-node_modules/ihp-datasync
 
                         ${node-modules}/node_modules/.bin/tailwindcss -i ./src/styles/globals.css -o ./src/tailwind.css
 
